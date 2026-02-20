@@ -1,0 +1,354 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>红石天气 - 透明视效版</title>
+
+  <link rel="icon" type="image/webp" href="img.webp" />
+  <meta name="color-scheme" content="dark light" />
+
+  <style>
+    :root {
+      /* 降低背景浓度，提升透明度，让壁纸透出来 */
+      --glass: rgba(255, 255, 255, 0.04); 
+      --glass-2: rgba(0, 0, 0, 0.15);
+      --stroke: rgba(255, 255, 255, 0.12);
+      --shadow: 0 20px 50px rgba(0, 0, 0, 0.25);
+      --text: rgba(255, 255, 255, 0.95);
+      --muted: rgba(255, 255, 255, 0.7);
+      --muted-2: rgba(255, 255, 255, 0.5);
+      --radius-xl: 28px;
+      --radius-lg: 20px;
+      --max: 1100px;
+      --safe-top: env(safe-area-inset-top, 0px);
+      --safe-bottom: env(safe-area-inset-bottom, 0px);
+      --vh: 1vh;
+    }
+
+    * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+    html, body { height: 100%; margin: 0; }
+    body {
+      font-family: ui-sans-serif, system-ui, -apple-system, sans-serif;
+      color: var(--text);
+      overflow-x: hidden;
+      background: #080c14;
+    }
+
+    /* 背景层 */
+    .bgWrap { position: fixed; inset: 0; z-index: -3; overflow: hidden; background: #000; }
+    .bgLayer {
+      position: absolute; inset: 0; background: center / cover no-repeat;
+      transform: scale(1.05); opacity: 0;
+      transition: opacity 1200ms cubic-bezier(0.4, 0, 0.2, 1), transform 1200ms ease-out;
+      will-change: opacity, transform;
+    }
+    .bgLayer.on { opacity: 1; transform: scale(1); }
+    .bgWrap::after {
+      content: ""; position: absolute; inset: 0;
+      background: linear-gradient(to bottom, rgba(0,0,0,0.1), rgba(0,0,0,0.4));
+      z-index: 2; pointer-events: none;
+    }
+
+    /* HUD：解决移动端遮挡 */
+    .hud { position: fixed; top: calc(12px + var(--safe-top)); left: 0; right: 0; z-index: 50; pointer-events: none; }
+    .hud-inner { width: min(var(--max), calc(100% - 24px)); margin: 0 auto; display: flex; justify-content: space-between; gap: 8px; }
+    .pill {
+      pointer-events: auto; display: inline-flex; align-items: center; gap: 8px;
+      padding: 8px 14px; border-radius: 999px; background: var(--glass-2);
+      border: 1px solid var(--stroke); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+    }
+    .pill .k { color: var(--muted-2); font-size: 11px; text-transform: uppercase; }
+    .pill .v { font-size: 13px; font-weight: 650; white-space: nowrap; }
+    .pill .dot { width: 6px; height: 6px; border-radius: 50%; background: #4effae; flex-shrink: 0; }
+
+    @media (max-width: 520px) {
+      .pill .k { display: none; } /* 移动端隐藏标签，只留核心信息 */
+      .pill .v { font-size: 12px; font-family: monospace; }
+    }
+
+    main { width: min(var(--max), calc(100% - 28px)); margin: 0 auto; padding: calc(80px + var(--safe-top)) 0 calc(20px + var(--safe-bottom)); }
+
+    /* 卡片：极致透明 */
+    .card {
+      border-radius: var(--radius-xl); background: var(--glass); border: 1px solid var(--stroke);
+      box-shadow: var(--shadow); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+      overflow: hidden; position: relative;
+    }
+    .hero-grid { display: grid; grid-template-columns: 1.2fr 0.8fr; gap: 20px; padding: 24px; }
+
+    .title h1 { margin: 0; font-size: clamp(24px, 4vw, 34px); font-weight: 800; }
+    .subtitle { margin-top: 8px; display: flex; gap: 8px; flex-wrap: wrap; }
+    .badge { padding: 4px 10px; border-radius: 999px; background: rgba(0,0,0,0.25); border: 1px solid var(--stroke); font-size: 11px; color: var(--muted); }
+
+    .now { display: flex; justify-content: space-between; align-items: center; padding: 20px 0; }
+    .temp .big { font-size: clamp(56px, 9vw, 80px); font-weight: 900; line-height: 1; }
+    .temp .feel { color: var(--muted); font-size: 14px; margin-top: 6px; }
+    .cond { text-align: right; }
+    .icon { font-size: 48px; margin-bottom: 4px; width: 64px; height: 64px; background: rgba(255,255,255,0.08); border-radius: 20px; display: inline-grid; place-items: center; }
+
+    .metrics { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+    .metric { padding: 16px; border-radius: var(--radius-lg); background: rgba(0,0,0,0.15); border: 1px solid var(--stroke); }
+    .metric .v { font-size: 18px; font-weight: 800; margin: 4px 0; }
+    .metric .k, .metric .s { font-size: 11px; color: var(--muted); }
+
+    .side { display: flex; flex-direction: column; gap: 12px; }
+    .mini { padding: 14px; border-radius: var(--radius-lg); background: rgba(0,0,0,0.15); border: 1px solid var(--stroke); }
+    .mini .k { font-size: 11px; color: var(--muted); }
+    .mini .v { font-size: 18px; font-weight: 800; margin-top: 4px; }
+    .mini .t { font-size: 11px; color: var(--muted-2); margin-top: 4px; }
+
+    /* 下滑提示 */
+    .scroll-hint { margin: 15px auto 0; width: fit-content; padding: 10px 20px; border-radius: 999px; background: rgba(0,0,0,0.3); border: 1px solid var(--stroke); font-size: 13px; color: var(--muted); backdrop-filter: blur(8px); animation: floaty 2s infinite; cursor: pointer; }
+    @keyframes floaty { 0%,100% { transform:translateY(0); } 50% { transform:translateY(5px); } }
+
+    /* 未来天气详情样式恢复 */
+    .section { margin-top: 30px; }
+    .grid-days { display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; }
+    .day { padding: 20px; border-radius: var(--radius-xl); background: var(--glass); border: 1px solid var(--stroke); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); }
+    .day .top { display: flex; justify-content: space-between; align-items: center; }
+    .day .date { font-weight: 800; font-size: 16px; }
+    .day .mid { display: flex; justify-content: space-between; align-items: center; margin: 15px 0; }
+    .day .t { font-size: 28px; font-weight: 900; }
+    .day .range { font-size: 12px; color: var(--muted); margin-top: 4px; }
+    .day .bot { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+    .chip { padding: 8px; border-radius: 12px; background: rgba(0,0,0,0.2); border: 1px solid var(--stroke); font-size: 11px; color: var(--muted); display: flex; justify-content: space-between; }
+    .chip b { color: #fff; }
+
+    /* 加载层：加入柔和缩放 */
+    .overlay {
+      position: fixed; inset: 0; z-index: 100; display: grid; place-items: center;
+      background: rgba(0,0,0,0.7); backdrop-filter: blur(15px);
+      transition: all 0.6s cubic-bezier(0.22, 1, 0.36, 1);
+    }
+    .overlay.hidden { opacity: 0; visibility: hidden; transform: scale(1.08); }
+    .loadCard { width: min(400px, 90%); padding: 30px; background: var(--glass); border: 1px solid var(--stroke); border-radius: var(--radius-xl); text-align: center; }
+    .ring { width: 40px; height: 40px; border: 3px solid rgba(255,255,255,0.1); border-top-color: #fff; border-radius: 50%; margin: 0 auto 20px; animation: spin 0.8s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    @media (max-width: 920px) { .hero-grid { grid-template-columns: 1fr; } .metrics { grid-template-columns: 1fr; } .grid-days { grid-template-columns: 1fr; } }
+  </style>
+</head>
+
+<body>
+  <div class="bgWrap" aria-hidden="true">
+    <div class="bgLayer" id="bgA"></div>
+    <div class="bgLayer" id="bgB"></div>
+  </div>
+
+  <div class="hud">
+    <div class="hud-inner">
+      <div class="pill">
+        <span class="dot"></span>
+        <div class="v" id="ipLine">定位中…</div>
+      </div>
+      <div class="pill">
+        <div class="k">Time</div>
+        <div class="v" id="clock">—</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="overlay" id="overlay">
+    <div class="loadCard">
+      <div class="ring"></div>
+      <div style="font-weight:800; font-size:18px; margin-bottom:8px;">正在同步大气数据</div>
+      <div style="font-size:13px; color:var(--muted);">正在接入红石镜像源...</div>
+      <div id="errBox" style="display:none; margin-top:15px; font-size:12px; color:#ff8e8e;"></div>
+      <div class="actions" style="margin-top:20px; display:flex; gap:10px; justify-content:center;">
+        <button onclick="location.reload()" style="padding:8px 20px; border-radius:99px; border:1px solid #fff; background:none; color:#fff; cursor:pointer;">重试</button>
+        <button onclick="document.getElementById('overlay').classList.add('hidden')" style="padding:8px 20px; border-radius:99px; border:none; background:rgba(255,255,255,0.1); color:#fff; cursor:pointer;">跳过</button>
+      </div>
+    </div>
+  </div>
+
+  <main>
+    <section class="hero">
+      <div class="card">
+        <div class="hero-grid">
+          <div class="main-info">
+            <div class="title">
+              <h1 id="headline">红石天气</h1>
+              <div class="subtitle">
+                <span class="badge" id="placeBadge">Locating...</span>
+                <span class="badge" id="sourceBadge">Source: Mirror</span>
+              </div>
+            </div>
+            <div class="now">
+              <div class="temp">
+                <div class="big" id="tempNow">—°</div>
+                <div class="feel" id="feelNow">体感：— · 湿度：—</div>
+              </div>
+              <div class="cond">
+                <div class="icon" id="emojiIcon">⛅</div>
+                <div id="condNow" style="font-weight:800; font-size:18px;">—</div>
+              </div>
+            </div>
+            <div class="metrics">
+              <div class="metric">
+                <div class="k">🌬️ 风速</div>
+                <div class="v" id="windNow">—</div>
+                <div class="s" id="windHint">正在计算</div>
+              </div>
+              <div class="metric">
+                <div class="k">🌧️ 降水</div>
+                <div class="v" id="rainNow">—</div>
+                <div class="s" id="rainHint">今日概率</div>
+              </div>
+              <div class="metric">
+                <div class="k">👁️ 能见度</div>
+                <div class="v" id="visNow">—</div>
+                <div class="s" id="visHint">空气透明度</div>
+              </div>
+            </div>
+          </div>
+          <aside class="side">
+            <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
+              <div class="mini">
+                <div class="k">温差范围</div>
+                <div class="v" id="hiLo">—</div>
+                <div class="t" id="uv">UV: —</div>
+              </div>
+              <div class="mini">
+                <div class="k">气压</div>
+                <div class="v" id="pressure">—</div>
+                <div class="t" id="cloud">云量: —</div>
+              </div>
+            </div>
+            <div class="mini">
+              <div class="k">日出日落</div>
+              <div class="v" id="sun">—</div>
+              <div class="t" id="moon">月相: —</div>
+            </div>
+            <div class="mini" style="background:rgba(255,255,255,0.06);">
+              <div class="k">生活建议</div>
+              <div class="v" id="adviceTitle" style="font-size:16px;">—</div>
+              <div class="t" id="adviceText">—</div>
+            </div>
+          </aside>
+        </div>
+      </div>
+      <div class="scroll-hint" id="scrollHint"><span>下滑查看未来 48 小时预报</span></div>
+    </section>
+
+    <section class="section" id="future">
+      <div style="margin-bottom:15px; font-weight:800; font-size:18px; padding-left:10px;">趋势详情预报</div>
+      <div class="grid-days" id="days"></div>
+    </section>
+  </main>
+
+  <script>
+    const LOCATION_API = "https://hongshi819-location.hf.space/";
+    const WEATHER_BASE = "https://weather.hongshi.de5.net/";
+    const BG_MAX_MOBILE = 33, BG_MAX_DESKTOP = 18;
+
+    const setText = (id, val) => { const el = document.getElementById(id); if(el) el.textContent = val; };
+    const pad = (n) => String(n).padStart(2, '0');
+
+    function tick() {
+      const d = new Date();
+      setText('clock', `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`);
+    }
+    setInterval(tick, 1000); tick();
+
+    let bgToggle = true;
+    async function swapBg() {
+      const isMob = window.innerWidth < 920;
+      const dir = isMob ? "mobile/" : "desktop/";
+      const prefix = isMob ? "m-background" : "d-background";
+      const idx = Math.floor(Math.random() * (isMob ? BG_MAX_MOBILE : BG_MAX_DESKTOP)) + 1;
+      const url = `${dir}${prefix}${idx}.jpg?v=${Date.now()}`;
+      const img = new Image();
+      img.src = url;
+      img.onload = () => {
+        const on = bgToggle ? document.getElementById('bgA') : document.getElementById('bgB');
+        const off = bgToggle ? document.getElementById('bgB') : document.getElementById('bgA');
+        off.style.backgroundImage = `url(${url})`;
+        off.classList.add('on');
+        on.classList.remove('on');
+        bgToggle = !bgToggle;
+      };
+    }
+    setInterval(swapBg, 25000); swapBg();
+
+    async function init() {
+      try {
+        const loc = await (await fetch(LOCATION_API)).json();
+        const regions = loc.regions_short || loc.regions || [];
+        const city = regions[1] || "未知位置";
+        setText('ipLine', loc.ip);
+        setText('placeBadge', regions.join(' · '));
+        setText('headline', `${city} · 今日状况`);
+
+        const weather = await (await fetch(`${WEATHER_BASE}${encodeURIComponent(city)}?format=j1&lang=zh`)).json();
+        render(weather);
+        setTimeout(() => document.getElementById('overlay').classList.add('hidden'), 500);
+      } catch (e) {
+        document.getElementById('errBox').style.display = 'block';
+        setText('errBox', `同步失败: ${e.message}`);
+      }
+    }
+
+    function codeToEmoji(code) {
+      const c = String(code);
+      if (c.startsWith("1")) return "☀️";
+      if (c.startsWith("2")) return "⛈️";
+      if (c.startsWith("3")) return "🌧️";
+      return "⛅";
+    }
+
+    function render(w) {
+      const cur = w.current_condition[0];
+      const today = w.weather[0];
+      setText('tempNow', `${cur.temp_C}°`);
+      setText('feelNow', `体感 ${cur.FeelsLikeC}° · 湿度 ${cur.humidity}%`);
+      setText('condNow', cur.weatherDesc[0].value);
+      setText('emojiIcon', codeToEmoji(cur.weatherCode));
+      setText('windNow', `${cur.windspeedKmph}km/h`);
+      setText('windHint', `风向: ${cur.winddir16Point}`);
+      setText('rainNow', `${today.hourly[0].chanceofrain}%`);
+      setText('visNow', `${cur.visibility}km`);
+      setText('hiLo', `${today.maxtempC}° / ${today.mintempC}°`);
+      setText('pressure', `${cur.pressure}hPa`);
+      setText('cloud', `${cur.cloudcover}%`);
+      setText('sun', `${today.astronomy[0].sunrise} / ${today.astronomy[0].sunset}`);
+      setText('moon', today.astronomy[0].moon_phase);
+      
+      const t = parseInt(cur.temp_C);
+      setText('adviceTitle', t > 28 ? "建议避暑" : t > 15 ? "气温舒适" : "注意保暖");
+      setText('adviceText', `当前实时观测时间: ${cur.observation_time}`);
+
+      const days = document.getElementById('days');
+      days.innerHTML = '';
+      w.weather.slice(1,3).forEach(d => {
+        const pick = d.hourly[4]; 
+        const div = document.createElement('div');
+        div.className = 'day';
+        div.innerHTML = `
+          <div class="top">
+            <div class="date">${d.date}</div>
+            <div style="font-size:12px; color:var(--muted);">${pick.weatherDesc[0].value}</div>
+          </div>
+          <div class="mid">
+            <div>
+              <div class="t">${d.avgtempC}°</div>
+              <div class="range">最高 ${d.maxtempC}° / 最低 ${d.mintempC}°</div>
+            </div>
+            <div class="icon" style="width:50px; height:50px; font-size:32px;">${codeToEmoji(pick.weatherCode)}</div>
+          </div>
+          <div class="bot">
+            <div class="chip"><span>降雨概率</span><b>${pick.chanceofrain}%</b></div>
+            <div class="chip"><span>平均湿度</span><b>${pick.humidity}%</b></div>
+            <div class="chip"><span>中午风速</span><b>${pick.windspeedKmph}k/h</b></div>
+            <div class="chip"><span>能见度</span><b>${pick.visibility}km</b></div>
+          </div>
+        `;
+        days.appendChild(div);
+      });
+    }
+
+    document.getElementById('scrollHint').onclick = () => document.getElementById('future').scrollIntoView({behavior:'smooth'});
+    init();
+  </script>
+</body>
+</html>
