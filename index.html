@@ -164,17 +164,54 @@
     async function init() {
       try {
         const loc = await (await fetch(LOCATION_API)).json();
-        const regions = loc.regions_short || loc.regions || [];
-        const city = regions[1] || "未知位置";
-        setText('ipLine', loc.ip);
-        setText('placeBadge', regions.join(' · '));
-        setText('headline', `${city} · 今日状况`);
+        
+        // 适配新的 API 返回格式
+        const ip = loc.ip || "未知IP";
+        const regions = loc.regions || [];
+        const country = loc.country?.name || "";
+        const asInfo = loc.as?.name || "";
+        
+        // 构建完整的位置显示（国家 + 省份）
+        let fullLocation = "";
+        if (regions.length > 0) {
+          fullLocation = regions.join(" · ");
+        } else if (country) {
+          fullLocation = country;
+        } else {
+          fullLocation = "未知位置";
+        }
+        
+        // 获取城市名（用于天气查询）
+        let cityName = "";
+        if (regions.length > 0) {
+          cityName = regions[0]; // 使用第一个区域（通常是省份或城市）
+        } else if (country) {
+          cityName = country;
+        } else {
+          cityName = "北京"; // 默认城市
+        }
+        
+        // 显示 IP 和运营商信息
+        let ipDisplay = ip;
+        if (asInfo) {
+          ipDisplay += ` (${asInfo})`;
+        }
+        setText('ipLine', ipDisplay);
+        setText('placeBadge', fullLocation || "未知位置");
+        setText('headline', `${cityName} · 今日状况`);
 
-        const weather = await (await fetch(`${WEATHER_BASE}${encodeURIComponent(city)}?format=j1&lang=zh`)).json();
+        // 如果有经纬度信息，可以打印出来供调试（可选）
+        if (loc.location) {
+          console.log(`定位坐标: ${loc.location.latitude}, ${loc.location.longitude}`);
+        }
+
+        const weather = await (await fetch(`${WEATHER_BASE}${encodeURIComponent(cityName)}?format=j1&lang=zh`)).json();
         render(weather);
         setTimeout(() => document.getElementById('overlay').classList.add('hidden'), 500);
       } catch (e) {
+        console.error("初始化错误:", e);
         document.getElementById('errBox').style.display = 'block';
+        document.getElementById('errBox').innerHTML = `同步失败: ${e.message}<br>请检查网络连接后点击重试`;
         setText('errBox', `同步失败: ${e.message}`);
       }
     }
